@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
-import os, sys, getopt, MySQLdb, phpserialize, math, time, urllib2, urllib, httplib
-
+import os
+import sys
 import xmlrpclib
+
+import MySQLdb
 
 server = xmlrpclib.ServerProxy("http://kismet2.lognllc.com/services/xmlrpc")
 

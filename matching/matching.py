@@ -19,7 +19,7 @@ def get_service_score(uid):
 	cursor = db.cursor()
 
     # if twitter is enabled add 2
-	SQL = "select * from %s_users where uid=" + str(uid)
+	SQL = "select * from %s_users where uid=" + str(uid) + " limit 2"
 	SERVICES = {"twitter":2, "instagram":4, "goodreads":8, "pandora":4, "flickr":5, "picplz":4, "foursquare":3}
 
 	for service in  SERVICES.keys():
@@ -36,9 +36,14 @@ def get_service_score(uid):
 	
 def get_fb_likes_score(auth_token, uid, target_uid):	
 	score = 0
-	likes = server.fb_likes.get("SdGCrJNXxfxWeJytbUXfPVt3qFjcn6mkv5uYCcj6Qzzqq5RJWNwKpfbsZDTWUfCh", uid)
 
-	print likes
+	likes = []
+
+	try:
+		likes = server.fb_likes.get_common_likes(auth_token, target_uid)
+	except Exception, e:
+		print "Error fetching fb likes_score for uid=%s, target_uid=%s, %r" % (uid, target_uid, e)
+
 	score = len(likes)
 	if score > 10:
 		score = 10
@@ -47,8 +52,27 @@ def get_fb_likes_score(auth_token, uid, target_uid):
 
 def get_fb_dos_score(auth_token, target_uid):
 	score = 0
-	output = server.fb.get_dos(auth_token, target_uid)
-	print output
+	output = None
+	try:
+		path = server.fb.get_dos(auth_token, target_uid)
+		dos = 1 + (len(path) - 2)
+		sum = 0
+		if dos == 2:
+			score = score + 20
+			sum = len(path[1])
+		elif dos == 3:
+			score = score + 15
+			sum = len(path[1]) + len(path[2])
+		elif dos == 4:
+			score = score + 10
+			sum = len(path[1]) + len(path[2]) + len(path[3])
+
+		if sum > 4:
+			sum = 4
+		score = score + sum
+	 
+	except Exception, e:
+		print "Error fetching fb dos_score for uid=%s, target_uid=%s, %r" % (uid, target_uid, e)
 	return score
 	
 
@@ -57,7 +81,8 @@ if __name__ == '__main__':
 	global SERVER_PREFIX
 	SERVER_PREFIX="http://kismet2.lognllc.com/admin/build/services/browse"
 
-	db = MySQLdb.connect(host="localhost", passwd="", user="root", db="kismet")
+	db = MySQLdb.connect(host="kismet2.lognllc.com", passwd="webuser112233", user="webuser", db="kismet_dev")
+	db.autocommit(True)
 
 	sql = "SELECT uid, token from services_authtoken_tokens"
 	cursor = db.cursor()
@@ -72,9 +97,12 @@ if __name__ == '__main__':
 		print "Uid is %s and auth_token is %s" %  (uid, auth_token)
 		cursor.close() 
 		service_score = get_service_score(uid) 
-		print "service score is %d " % service_score
 		for data2 in rows:
+			print "service score is %d " % service_score
 			target_uid = data2[0]	
+			print "target_uid is %s" % target_uid
+			if uid == target_uid:
+				continue
 			fb_likes_score = get_fb_likes_score(auth_token, uid, target_uid)
 			print "fb likes score is %d" % fb_likes_score
 			fb_dos_score = get_fb_dos_score(auth_token, target_uid)
@@ -84,7 +112,7 @@ if __name__ == '__main__':
 			print sql 
 			cursor = db.cursor()
 			cursor.execute(sql)
-		print cursor.fetchone()
+			print cursor.fetchall()
 		cursor.close() 
 	db.close()
 	
